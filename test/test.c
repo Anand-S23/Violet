@@ -13,6 +13,7 @@
 bool test_h1(void);
 bool test_h2(void);
 bool test_h3(void);
+bool test_paragraph(void);
 bool test_bold(void);
 bool test_italics(void);
 
@@ -20,6 +21,7 @@ const char *test_func_names[] = {
     "test_h1",
     "test_h2",
     "test_h3",
+    "test_paragraph",
     "test_bold",
     "test_italics"
 };
@@ -28,6 +30,7 @@ bool (*test_funcs[])(void) = {
     test_h1,
     test_h2,
     test_h3,
+    test_paragraph,
     test_bold,
     test_italics
 };
@@ -196,6 +199,47 @@ bool test_h3(void)
         (token_t) {
             .type = TT_header,
             .count = 3,
+            .len = 0,
+            .start = NULL,
+            .external = (external_token_t){0},
+            .is_end_node = 1
+        }
+    }; 
+
+    // Compare the buffers to make sure they are the same
+    bool result = test_verify_matching_array(gen.token_buffer,
+                                             sb_len(gen.token_buffer),
+                                             test_tb, arr_size(test_tb));
+    free(test_input);
+    return result;
+}
+
+bool test_paragraph(void)
+{
+    const char *input_val = "This is a paragraph\n";
+    int input_val_size = strlen(input_val);
+    int start_offset = 0;
+    int removeable_characters = 1;
+    
+    char *test_input = test_get_input(input_val, input_val_size);
+
+    // Generate the buffer from the test input
+    parser_t gen = (parser_t){0}; 
+    violet_parse_stream(&gen, test_input);
+
+    // Generate what the output buffer should be
+    token_t test_tb[2] = {
+        (token_t) {
+            .type = TT_paragraph,
+            .count = 0,
+            .len = (input_val_size - removeable_characters),
+            .start = (test_input + start_offset),
+            .external = (external_token_t){0},
+            .is_end_node = 0
+        },
+        (token_t) {
+            .type = TT_paragraph,
+            .count = 0,
             .len = 0,
             .start = NULL,
             .external = (external_token_t){0},
