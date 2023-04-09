@@ -9,43 +9,181 @@
 #include "../src/util.h"
 #include "../src/parser.c"
 
-bool test_heading(void);
+// Function declerations
+bool test_h1(void);
+bool test_h2(void);
+bool test_h3(void);
 
 const char *test_func_names[] = {
-    "test_heading"
+    "test_h1",
+    "test_h2",
+    "test_h3"
 };
 
 bool (*test_funcs[])(void) = {
-    test_heading,
+    test_h1,
+    test_h2,
+    test_h3
 };
+
+// Util
+
+bool test_verify_matching_array(token_t *tb_a, int tb_a_size,
+                                token_t *tb_b, int tb_b_size)
+{
+    if (tb_a_size != tb_b_size) return false;
+
+    for (int i = 0; i < tb_a_size; ++i)
+    {
+        // TODO: Check external_token
+        if (tb_a[i].type != tb_b[i].type ||
+            tb_a[i].len != tb_b[i].len ||
+            tb_a[i].count != tb_b[i].count ||
+            tb_a[i].is_end_node != tb_b[i].is_end_node ||
+            tb_a[i].start != tb_b[i].start)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+char *test_get_input(const char *value, int value_size)
+{
+    int byte_size = sizeof(char) * (value_size + 1);
+    char *test_input = (char *)malloc(byte_size);
+    strncpy(test_input, value, value_size);
+    test_input[value_size + 1] = '\0';
+    return test_input;
+}
 
 // Tests //
 
-#define unused(x) (void)x
-
-bool test_heading(void)
+bool test_h1(void)
 {
-    // TODO: Note string must be null terminated
-    const char *test_input = "# This a test for heading\0";
-    unused(test_input);
+    const char *input_val = "# Header 1\n";
+    int input_val_size = strlen(input_val);
+    int start_offset = 2;
+    int removeable_characters = 3;
+    
+    char *test_input = test_get_input(input_val, input_val_size);
 
-    // TODO:
-    // Generate what the output buffer should be
     // Generate the buffer from the test input
+    parser_t gen = (parser_t){0}; 
+    violet_parse_stream(&gen, test_input);
+
+    // Generate what the output buffer should be
+    token_t test_tb[2] = {
+        (token_t) {
+            .type = TT_header,
+            .count = 1,
+            .len = (input_val_size - removeable_characters),
+            .start = (test_input + start_offset),
+            .external = (external_token_t){0},
+            .is_end_node = 0
+        },
+        (token_t) {
+            .type = TT_header,
+            .count = 1,
+            .len = 0,
+            .start = NULL,
+            .external = (external_token_t){0},
+            .is_end_node = 1
+        }
+    }; 
+
     // Compare the buffers to make sure they are the same
-
-    return true;
+    bool result = test_verify_matching_array(gen.token_buffer,
+                                             sb_len(gen.token_buffer),
+                                             test_tb, arr_size(test_tb));
+    free(test_input);
+    return result;
 }
 
-// Test Core // 
-
-bool test_verify_matching_array(token_t *tb_a, token_t *tb_b)
+bool test_h2(void)
 {
-    unused(tb_a);
-    unused(tb_b);
-    // TODO: Implement
-    return true;
+    const char *input_val = "## Header 2\n";
+    int input_val_size = strlen(input_val);
+    int start_offset = 3;
+    int removeable_characters = 4;
+    
+    char *test_input = test_get_input(input_val, input_val_size);
+
+    // Generate the buffer from the test input
+    parser_t gen = (parser_t){0}; 
+    violet_parse_stream(&gen, test_input);
+
+    // Generate what the output buffer should be
+    token_t test_tb[2] = {
+        (token_t) {
+            .type = TT_header,
+            .count = 2,
+            .len = (input_val_size - removeable_characters),
+            .start = (test_input + start_offset),
+            .external = (external_token_t){0},
+            .is_end_node = 0
+        },
+        (token_t) {
+            .type = TT_header,
+            .count = 2,
+            .len = 0,
+            .start = NULL,
+            .external = (external_token_t){0},
+            .is_end_node = 1
+        }
+    }; 
+
+    // Compare the buffers to make sure they are the same
+    bool result = test_verify_matching_array(gen.token_buffer,
+                                             sb_len(gen.token_buffer),
+                                             test_tb, arr_size(test_tb));
+    free(test_input);
+    return result;
 }
+
+bool test_h3(void)
+{
+    const char *input_val = "### Header 3\n";
+    int input_val_size = strlen(input_val);
+    int start_offset = 4;
+    int removeable_characters = 5;
+    
+    char *test_input = test_get_input(input_val, input_val_size);
+
+    // Generate the buffer from the test input
+    parser_t gen = (parser_t){0}; 
+    violet_parse_stream(&gen, test_input);
+
+    // Generate what the output buffer should be
+    token_t test_tb[2] = {
+        (token_t) {
+            .type = TT_header,
+            .count = 3,
+            .len = (input_val_size - removeable_characters),
+            .start = (test_input + start_offset),
+            .external = (external_token_t){0},
+            .is_end_node = 0
+        },
+        (token_t) {
+            .type = TT_header,
+            .count = 3,
+            .len = 0,
+            .start = NULL,
+            .external = (external_token_t){0},
+            .is_end_node = 1
+        }
+    }; 
+
+    // Compare the buffers to make sure they are the same
+    bool result = test_verify_matching_array(gen.token_buffer,
+                                             sb_len(gen.token_buffer),
+                                             test_tb, arr_size(test_tb));
+    free(test_input);
+    return result;
+}
+
+// Core // 
 
 int main(void)
 {
@@ -53,9 +191,8 @@ int main(void)
     // Name array has to be same length as the test funcs
     assert(test_funcs_size == arr_size(test_func_names));
 
-
-    uint32_t tests_passed_count = 0;
     bool (*current)(void);
+    uint32_t tests_passed_count = 0;
     for (uint32_t i = 0; i < test_funcs_size; ++i)
     {
         current = test_funcs[i];
@@ -74,7 +211,7 @@ int main(void)
         }
     }
 
-    printf("Test finished running...\n(%d/%d) passed\n", 
+    printf("\nTest finished running...\n - (%d/%d) passed\n", 
         tests_passed_count, test_funcs_size);
 
     return 0;

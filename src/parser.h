@@ -76,11 +76,11 @@ typedef struct external_token_t
 typedef struct token_t
 {
     token_type_t type;
-    uint32_t count;
     uint32_t len;
-    const char *start;
-    external_token_t external;
+    uint32_t count;
     bool is_end_node;
+    external_token_t external;
+    const char *start;
 } token_t;
 
 typedef struct parser_t
