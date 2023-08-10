@@ -42,7 +42,7 @@ bool test_verify_matching_array(token_t *tb_a, int tb_a_size,
 {
     if (tb_a_size != tb_b_size)
     {
-        printf(" - Token buffer sizes do not match\n");
+        printf("\n - Token buffer sizes do not match\n");
         return false;
     }
 
@@ -345,6 +345,7 @@ int main(void)
     // Name array has to be same length as the test funcs
     assert(test_funcs_size == arr_size(test_func_names));
 
+    printf("\n"); 
     bool (*current)(void);
     uint32_t tests_passed_count = 0;
     for (uint32_t i = 0; i < test_funcs_size; ++i)
@@ -368,5 +369,6 @@ int main(void)
     printf("\nTest finished running...\n - (%d/%d) passed\n", 
         tests_passed_count, test_funcs_size);
 
+    printf("\n"); 
     return 0;
 }
