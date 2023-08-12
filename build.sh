@@ -18,5 +18,7 @@ test=../test/test.c
 test_name=violet_test
 $CC $CFLAGS -o violet_test $test
 
+./violet_test
+
 cd ..
 

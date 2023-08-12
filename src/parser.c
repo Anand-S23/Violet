@@ -133,12 +133,359 @@ static bool violet_check_if_valid_external_token(char *stream, external_token_ty
             open_paren == 3 && close_paren == 4);
 }
 
+static int violet_parse_hashtag(parser_t *parser, char *stream)
+{
+    char *start = stream;
+
+    int symbol_count = 1;
+    while (*++stream == '#')
+    {
+        ++symbol_count;
+    }
+
+    if (*stream != ' ')
+    {
+        parser->current_token = (token_t) {
+            .type = TT_paragraph,
+            .start = (stream -= symbol_count)
+        };
+    }
+    else
+    {
+        parser->current_token = (token_t) {
+            .type = TT_header,
+            .count = symbol_count,
+            .start = ++stream
+        };
+    }
+
+    char c;
+    while (c = *stream++,
+            !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
+    {
+        ++parser->current_token.len;
+    }
+    --stream;
+
+    return (int)(stream - start);
+}
+
+static int violet_parse_asterisk(parser_t *parser, char *stream)
+{
+    char *start = stream;
+
+    bool two_asterix = (*++stream == '*');
+    int etb_size = sb_len(parser->end_token_buffer);
+    token_t last_etb_element = etb_size > 0 ?
+        parser->end_token_buffer[etb_size - 1] : (token_t){0};
+    token_type_t last_etb_element_type = last_etb_element.type;
+
+    if ((two_asterix && last_etb_element_type == TT_bold) ||
+        last_etb_element_type == TT_italics)
+    {
+        if (last_etb_element_type == TT_bold)
+        {
+            ++stream;
+        }
+
+        violet_shift_last_etb_element(parser, last_etb_element_type);
+        return (int)(stream - start);
+    }
+
+    if (two_asterix && violet_check_for_symbol_string(++stream, "**"))
+    {
+        parser->current_token = (token_t) {
+            .type = TT_bold,
+            .start = stream,
+            .count = 2
+        };
+    }
+    else if (violet_check_for_symbol_string(stream, "*"))
+    {
+        parser->current_token = (token_t) {
+            .type = TT_italics,
+            .start = stream,
+            .count = 1
+        };
+    }
+    else
+    {
+        int symbol_count = (int)two_asterix * 1 + 1;
+        parser->current_token = (token_t) {
+            .type = TT_continue,
+            .start = (stream -= symbol_count)
+        };
+    }
+
+    char c;
+    while (c = *stream++,
+            !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
+    {
+        ++parser->current_token.len;
+    }
+    --stream;
+
+    return (int)(stream - start);
+}
+
+static int violet_parse_angle_bracket(parser_t *parser, char *stream)
+{
+    char *start = stream;
+
+    parser->current_token = (token_t) {
+        .type = TT_paragraph,
+        .start = stream
+    };
+
+    if (*++stream == ' ')
+    {
+        parser->current_token.type = TT_blockquote;
+        parser->current_token.start = ++stream;
+    }
+
+    char c;
+    while (c = *stream++,
+           !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
+    {
+        ++parser->current_token.len;
+    }
+    --stream;
+
+    return (int)(stream - start);
+}
+
+/*
+static int violet_parse_unordered_list(parser_t *parser, char *stream)
+{
+    char *start = stream;
+    int current_item = 0;
+
+    token_t end_token = (token_t) {
+        .type = TT_list_item,
+        .is_end_node = 1
+    };
+
+    while (1)
+    {
+        if (*stream != '-' && *(stream + 1) != ' ') break;
+        stream += 2;
+
+        token_t current_token = (token_t) {
+            .type = (!!current_item) ? TT_list_item : TT_unordered_list,
+            .count = ++current_item,
+            .start = stream
+        };
+
+        char c;
+        // TODO: Not currently checking for sybmols
+        while (c = *stream++, violet_is_char_endspace(c)))
+        {
+            ++parser->current_token.len;
+        }
+        --stream;
+
+        sb_append(parser->token_buffer, current_token);
+        sb_append(parser->token_buffer, end_token);
+    }
+}
+*/
+
+static int violet_parse_dash(parser_t *parser, char *stream, int *list_started)
+{
+    char *start = stream;
+
+    int symbol_count = 1;
+    while (*++stream == '-')
+    {
+        ++symbol_count;
+    }
+
+    if (symbol_count == 1)
+    {
+        // TODO: Unordered List
+        parser->current_token = (token_t) {
+            .type = (*list_started ? TT_list_item : TT_unordered_list),
+            .count = symbol_count,
+            .start = ++stream
+        };
+    }
+    else if (symbol_count == 3)
+    {
+        // TODO: Fix this does not make sense
+        parser->current_token = (token_t) {
+            .type = TT_paragraph,
+            .start = (stream -= symbol_count)
+        };
+
+        char c;
+        while (c = *stream++, violet_is_char_whitespace(c))
+        {
+            ++parser->current_token.len;
+        }
+
+        if (*stream == '\n')
+        {
+            if (violet_is_char_whitespace(*--stream))
+            {
+                parser->current_token.type = TT_break;
+            }
+            else
+            {
+                --parser->current_token.len;
+            }
+        }
+    }
+    else
+    {
+        parser->current_token = (token_t) {
+            .type = TT_paragraph,
+            .start = (stream -= symbol_count)
+        };
+    }
+
+    char c;
+    while (c = *stream++,
+            !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
+    {
+        ++parser->current_token.len;
+    }
+    --stream;
+
+    return (int)(stream - start);
+}
+
+static int violet_parse_numbers(parser_t *parser, char *stream)
+{
+    // TODO: Implement
+    char *start = stream;
+    parser->current_token.len++;
+    parser->current_token.len--;
+    return (stream - start);
+}
+
+static int voilet_parse_grave_accent(parser_t *parser, char *stream)
+{
+    char *start = stream;
+
+    int etb_size = sb_len(parser->end_token_buffer);
+    token_t last_etb_element = etb_size > 0 ?
+        parser->end_token_buffer[etb_size - 1] : (token_t){0};
+    token_type_t last_etb_element_type = last_etb_element.type;
+
+    if (last_etb_element_type == TT_code)
+    {
+        violet_shift_last_etb_element(parser, last_etb_element_type);
+        ++stream;
+        return (int)(stream - start);
+    }
+
+    if (violet_check_for_symbol_string(++stream, "`"))
+    {
+        parser->current_token = (token_t) {
+            .type = TT_code,
+            .start = stream,
+            .count = 1
+        };
+    }
+    else
+    {
+        parser->current_token = (token_t) {
+            .type = TT_paragraph,
+            .start = --stream
+        };
+    }
+
+    char c;
+    while (c = *stream++,
+            !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
+    {
+        ++parser->current_token.len;
+    }
+    --stream;
+
+    return (int)(stream - start);
+}
+
+static int violet_parse_exclamation_and_bracket(parser_t *parser, char *stream)
+{
+    char *start = stream;
+
+    external_token_type_t ett = Link;
+    token_type_t tt = TT_link;
+    if (*stream == '!')
+    {
+        stream++;
+        ett = Image;
+        tt = TT_image;
+    }
+
+    parser->current_token = (token_t) {
+        .type = TT_paragraph,
+        .start = --stream
+    };
+
+    if (violet_check_if_valid_external_token(stream, ett))
+    {
+        parser->current_token.type = tt;
+
+        assert(*stream == '[');
+        parser->current_token.external.secondary = ++stream;
+
+        char c;
+        while (c = *stream++, c != ']')
+        {
+            parser->current_token.external.secondary_count++;
+        }
+
+        assert(*stream == '(');
+        parser->current_token.external.primary = ++stream;
+
+        while (c = *stream++, c != ')')
+        {
+            parser->current_token.external.primary_count++;
+        }
+    }
+
+    // TODO: Verify if this is what we want to do for image as well
+    char c;
+    while (c = *stream++,
+            !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
+    {
+        ++parser->current_token.len;
+    }
+    --stream;
+
+    return (int)(stream - start);
+}
+
+static int violet_parse_default(parser_t *parser, char *stream)
+{
+    char *start = stream;
+
+    parser->current_token = (token_t) {
+        .type = (sb_len(parser->end_token_buffer) == 0) ?
+            TT_paragraph : TT_continue,
+        .start = stream
+    };
+
+    char c;
+    while (c = *stream++,
+            !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
+    {
+        ++parser->current_token.len;
+    }
+    --stream;
+
+    return (int)(stream - start);
+}
+
 static void violet_parse_stream(parser_t *parser, char *stream)
 {
     while (*stream)
     {
         parser->current_token = (token_t){0};
         parser->should_push = true;
+        int jump = 0;
 
         switch (*stream)
         {
@@ -153,280 +500,45 @@ static void violet_parse_stream(parser_t *parser, char *stream)
             } break;
 
             case '#':
-            {
-                int symbol_count = 1;
-                while (*++stream == '#')
-                {
-                    ++symbol_count;
-                }
-
-                if (*stream != ' ')
-                {
-                    parser->current_token = (token_t) {
-                        .type = TT_paragraph,
-                        .start = (stream -= symbol_count)
-                    };
-                }
-                else
-                {
-                    parser->current_token = (token_t) {
-                        .type = TT_header,
-                        .count = symbol_count,
-                        .start = ++stream
-                    };
-                }
-
-                char c;
-                while (c = *stream++,
-                       !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
-                {
-                    ++parser->current_token.len;
-                }
-                --stream;
-            } break;
+                jump = violet_parse_hashtag(parser, stream);
+                break;
 
             case '*':
-            {
-                bool two_asterix = (*++stream == '*');
-                int etb_size = sb_len(parser->end_token_buffer);
-                token_t last_etb_element = etb_size > 0 ?
-                    parser->end_token_buffer[etb_size - 1] : (token_t){0};
-                token_type_t last_etb_element_type = last_etb_element.type;
-
-                if ((two_asterix && last_etb_element_type == TT_bold) ||
-                    last_etb_element_type == TT_italics)
-                {
-                    if (last_etb_element_type == TT_bold)
-                    {
-                        ++stream;
-                    }
-
-                    violet_shift_last_etb_element(parser, last_etb_element_type);
-                    break;
-                }
-
-                if (two_asterix && violet_check_for_symbol_string(++stream, "**"))
-                {
-                    parser->current_token = (token_t) {
-                        .type = TT_bold,
-                        .start = stream,
-                        .count = 2
-                    };
-                }
-                else if (violet_check_for_symbol_string(stream, "*"))
-                {
-                    parser->current_token = (token_t) {
-                        .type = TT_italics,
-                        .start = stream,
-                        .count = 1
-                    };
-                }
-                else
-                {
-                    int symbol_count = (int)two_asterix * 1 + 1;
-                    parser->current_token = (token_t) {
-                        .type = TT_continue,
-                        .start = (stream -= symbol_count)
-                    };
-                }
-
-                char c;
-                while (c = *stream++,
-                       !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
-                {
-                    ++parser->current_token.len;
-                }
-                --stream;
-            } break;
+                jump = violet_parse_asterisk(parser, stream);
+                break;
 
             case '>':
-            {
-                parser->current_token = (token_t) {
-                    .type = TT_paragraph,
-                    .start = stream
-                };
-
-                if (*++stream == ' ')
-                {
-                    parser->current_token.type = TT_blockquote;
-                    parser->current_token.start = ++stream;
-                }
-
-                char c;
-                while (c = *stream++,
-                       !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
-                {
-                    ++parser->current_token.len;
-                }
-                --stream;
-            } break;
+                jump = violet_parse_angle_bracket(parser, stream);
+                break;
 
             case '-':
-            {
-                int symbol_count = 1;
-                while (*++stream == '-')
-                {
-                    ++symbol_count;
-                }
-
-                if (symbol_count == 1)
-                {
-                    // TODO: Unordered List
-                }
-                else if (symbol_count == 3)
-                {
-                    // TODO; Write test for break
-                    parser->current_token = (token_t) {
-                        .type = TT_paragraph,
-                        .start = (stream -= symbol_count)
-                    };
-
-                    char c;
-                    while (c = *stream++, violet_is_char_whitespace(c))
-                    {
-                        ++parser->current_token.len;
-                    }
-
-                    if (*stream == '\n')
-                    {
-                        if (violet_is_char_whitespace(*--stream))
-                        {
-                            parser->current_token.type = TT_break;
-                        }
-                        else
-                        {
-                            --parser->current_token.len;
-                        }
-                    }
-                }
-                else
-                {
-                    parser->current_token = (token_t) {
-                        .type = TT_paragraph,
-                        .start = (stream -= symbol_count)
-                    };
-                }
-
-                char c;
-                while (c = *stream++,
-                       !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
-                {
-                    ++parser->current_token.len;
-                }
-                --stream;
-            } break;
+                // TODO: Implement
+                // jump = violet_parse_dash(parser, stream);
+                break;
 
             case '1': case '2': case '3':
             case '4': case '5': case '6':
             case '7': case '8': case '9':
-            {
-            } break;
+                // TODO: Implement
+                jump = violet_parse_numbers(parser, stream);
+                break;
 
             case '`':
-            {
-                int etb_size = sb_len(parser->end_token_buffer);
-                token_t last_etb_element = etb_size > 0 ?
-                    parser->end_token_buffer[etb_size - 1] : (token_t){0};
-                token_type_t last_etb_element_type = last_etb_element.type;
-
-                if (last_etb_element_type == TT_code)
-                {
-                    violet_shift_last_etb_element(parser, last_etb_element_type);
-                    ++stream;
-                    break;
-                }
-
-                if (violet_check_for_symbol_string(++stream, "`"))
-                {
-                    parser->current_token = (token_t) {
-                        .type = TT_code,
-                        .start = stream,
-                        .count = 1
-                    };
-                }
-                else
-                {
-                    parser->current_token = (token_t) {
-                        .type = TT_paragraph,
-                        .start = --stream
-                    };
-                }
-
-                char c;
-                while (c = *stream++,
-                       !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
-                {
-                    ++parser->current_token.len;
-                }
-                --stream;
-            } break;
+                jump = voilet_parse_grave_accent(parser, stream);
+                break;
 
             case '!':
             case '[':
-            {
-                external_token_type_t ett = Link;
-                token_type_t tt = TT_link;
-                if (*stream == '!')
-                {
-                    stream++;
-                    ett = Image;
-                    tt = TT_image;
-                }
-
-                parser->current_token = (token_t) {
-                    .type = TT_paragraph,
-                    .start = --stream
-                };
-
-                if (violet_check_if_valid_external_token(stream, ett))
-                {
-                    parser->current_token.type = tt;
-
-                    assert(*stream == '[');
-                    parser->current_token.external.secondary = ++stream;
-
-                    char c;
-                    while (c = *stream++, c != ']')
-                    {
-                        parser->current_token.external.secondary_count++;
-                    }
-
-                    assert(*stream == '(');
-                    parser->current_token.external.primary = ++stream;
-
-                    while (c = *stream++, c != ')')
-                    {
-                        parser->current_token.external.primary_count++;
-                    }
-                }
-
-                // TODO: Verify if this is what we want to do for image as well
-                char c;
-                while (c = *stream++,
-                       !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
-                {
-                    ++parser->current_token.len;
-                }
-                --stream;
-            } break;
+                // TODO: Finalize Implementation
+                jump = violet_parse_exclamation_and_bracket(parser, stream);
+                break;
 
             default:
-            {
-                parser->current_token = (token_t) {
-                    .type = (sb_len(parser->end_token_buffer) == 0) ?
-                        TT_paragraph : TT_continue,
-                    .start = stream
-                };
-
-                char c;
-                while (c = *stream++,
-                       !(violet_is_char_symbol(c) || violet_is_char_endspace(c)))
-                {
-                    ++parser->current_token.len;
-                }
-                --stream;
-            } break;
+                jump = violet_parse_default(parser, stream);
+                break;
         }
+
+        stream += jump;
 
         if (parser->should_push && parser->current_token.type != TT_NULL)
         {

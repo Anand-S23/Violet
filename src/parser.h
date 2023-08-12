@@ -11,11 +11,12 @@ const char *token_tags[] = {
     "NULL",
     "<h%d>\n",
     "<p>\n",
+    "<strong>\n",
     "<em>\n",
-    "<i>\n",
     "<blockquote>\n",
-    "<ul>\n",
-    "<ol>\n",
+    "<ul>\n<li>\n",
+    "<ol>\n<li>\n",
+    "<li>\n",
     "<code class='prettyprint'>\n",
     "<br>\n",
     "<a href='%s'>\n",
@@ -28,11 +29,12 @@ const char *token_end_tags[] = {
     "NULL",
     "</h%d>\n",
     "</p>\n",
+    "</strong>\n",
     "</em>\n",
-    "</i>\n",
     "</blockquote>\n",
     "</ul>\n",
     "</ol>\n",
+    "</li>\n",
     "</code>\n",
     "</br>\n",
     "</a>\n",
@@ -51,6 +53,7 @@ typedef enum token_type_t
     TT_blockquote,
     TT_unordered_list,
     TT_ordered_list,
+    TT_list_item,
     TT_code,
     TT_break,
     TT_link,
@@ -76,11 +79,11 @@ typedef struct external_token_t
 typedef struct token_t
 {
     token_type_t type;
-    uint32_t count;
     uint32_t len;
-    const char *start;
-    external_token_t external;
+    uint32_t count;
     bool is_end_node;
+    external_token_t external;
+    const char *start;
 } token_t;
 
 typedef struct parser_t
