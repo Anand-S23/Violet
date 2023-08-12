@@ -55,22 +55,6 @@ Currently Windows and MacOS are not directly supported, will be added later on
 `Code`
 ```
 
-### Needs To Be Implemented
-
-**Ordered List**
-```
-1. First Item
-2. Second Item
-3. Third Item
-```
-
-**Unordered List**
-```
-- First Item
-- Second Item
-- Third Item
-```
-
 **Break**
 ```
 ---
@@ -84,6 +68,22 @@ Currently Windows and MacOS are not directly supported, will be added later on
 **Image**
 ```
 ![Alt Text](image.jpg)
+```
+
+### In Development
+
+**Ordered List**
+```
+1. First Item
+2. Second Item
+3. Third Item
+```
+
+**Unordered List**
+```
+- First Item
+- Second Item
+- Third Item
 ```
 
 ## To Contribute
